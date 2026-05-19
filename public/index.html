@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>LendDocs — Enterprise Lending Documentation System</title>
+<style>
+:root{
+  --bg:#0a0c10;--bg2:#111318;--bg3:#1a1d24;--bg4:#22262f;
+  --border:#2a2f3a;--border2:#363c4a;
+  --accent:#4f8ef7;--accent2:#3a6fd8;--accent-glow:rgba(79,142,247,0.18);
+  --red:#e85454;--green:#2ecc71;--yellow:#f0b429;--purple:#9b6dff;
+  --text:#e8ecf3;--text2:#9aa3b2;--text3:#5a6478;
+  --radius:10px;--radius2:14px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* ── Layout ── */
+.shell{display:flex;height:100vh;overflow:hidden}
+
+/* ── Sidebar ── */
+.sidebar{width:220px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
+.sidebar-logo{padding:22px 18px 18px;display:flex;align-items:center;gap:11px;border-bottom:1px solid var(--border)}
+.sidebar-logo .icon{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),var(--purple));border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.sidebar-logo .brand{font-size:.95rem;font-weight:700;line-height:1.2}
+.sidebar-logo .brand span{display:block;font-size:.68rem;color:var(--text2);font-weight:400;margin-top:2px}
+.sidebar-nav{padding:14px 10px;flex:1}
+.nav-section{font-size:.65rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;padding:10px 8px 6px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:.83rem;color:var(--text2);transition:all .15s;margin-bottom:2px;user-select:none}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-item.active{background:var(--accent-glow);color:var(--accent);font-weight:600}
+.nav-item .ni{font-size:15px;width:18px;text-align:center;flex-shrink:0}
+.sidebar-footer{padding:14px;border-top:1px solid var(--border)}
+.version-badge{font-size:.68rem;color:var(--text3);text-align:center}
+
+/* ── Main ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:56px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:14px;flex-shrink:0}
+.topbar h2{font-size:1rem;font-weight:600;flex:1}
+.topbar .tb-badge{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:4px 12px;font-size:.75rem;color:var(--text2)}
+.content{flex:1;overflow-y:auto;padding:24px}
+
+/* ── Page sections ── */
+.page{display:none}
+.page.active{display:block}
+
+/* ── Cards ── */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius2);margin-bottom:20px;overflow:hidden}
+.card-header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.card-header h3{font-size:.88rem;font-weight:600;display:flex;align-items:center;gap:8px}
+.card-body{padding:20px}
+
+/* ── Grid ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media(max-width:900px){.g3,.g4{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}}
+
+/* ── Form ── */
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:.72rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em}
+.field input,.field select,.field textarea{
+  background:var(--bg3);border:1px solid var(--border2);border-radius:7px;
+  padding:9px 12px;font-size:.85rem;color:var(--text);font-family:inherit;
+  transition:border-color .15s,box-shadow .15s;outline:none}
+.field input:focus,.field select:.field select:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+.field select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+.field input::placeholder,.field textarea::placeholder{color:var(--text3)}
+.field textarea{resize:vertical;min-height:68px}
+.field select option{background:var(--bg3)}
+.section-sep{font-size:.7rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.09em;padding:14px 0 8px;border-bottom:1px solid var(--border);margin-bottom:14px}
+</style>
+
+<style>
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:7px;font-size:.82rem;font-weight:600;cursor:pointer;border:none;transition:all .15s;font-family:inherit}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent2);transform:translateY(-1px);box-shadow:0 4px 16px rgba(79,142,247,.35)}
+.btn-danger{background:rgba(232,84,84,.15);color:var(--red);border:1px solid rgba(232,84,84,.3)}
+.btn-danger:hover{background:rgba(232,84,84,.25)}
+.btn-ghost{background:var(--bg3);color:var(--text2);border:1px solid var(--border2)}
+.btn-ghost:hover{color:var(--text);border-color:var(--border2);background:var(--bg4)}
+.btn-success{background:rgba(46,204,113,.15);color:var(--green);border:1px solid rgba(46,204,113,.3)}
+.btn-success:hover{background:rgba(46,204,113,.25)}
+.btn-sm{padding:5px 11px;font-size:.76rem}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+.btn-generate{background:linear-gradient(135deg,#e94560,#c0392b);color:#fff;padding:13px 40px;font-size:.95rem;border-radius:10px;box-shadow:0 4px 20px rgba(233,69,96,.4)}
+.btn-generate:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(233,69,96,.5)}
+
+/* ── Stat cards ── */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+@media(max-width:900px){.stat-grid{grid-template-columns:1fr 1fr}}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius2);padding:18px;display:flex;align-items:center;gap:14px}
+.stat-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.stat-icon.blue{background:rgba(79,142,247,.15)}
+.stat-icon.green{background:rgba(46,204,113,.15)}
+.stat-icon.yellow{background:rgba(240,180,41,.15)}
+.stat-icon.purple{background:rgba(155,109,255,.15)}
+.stat-val{font-size:1.6rem;font-weight:800;line-height:1}
+.stat-lbl{font-size:.73rem;color:var(--text2);margin-top:4px}
+
+/* ── Table ── */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+thead th{background:var(--bg3);padding:10px 14px;text-align:left;font-size:.7rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border)}
+tbody td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:rgba(255,255,255,.02)}
+
+/* ── Badge ── */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:.7rem;font-weight:600}
+.badge-green{background:rgba(46,204,113,.15);color:var(--green)}
+.badge-red{background:rgba(232,84,84,.15);color:var(--red)}
+.badge-blue{background:rgba(79,142,247,.15);color:var(--accent)}
+.badge-yellow{background:rgba(240,180,41,.15);color:var(--yellow)}
+.badge-purple{background:rgba(155,109,255,.15);color:var(--purple)}
+
+/* ── Upload zone ── */
+.upload-zone{border:2px dashed var(--border2);border-radius:10px;padding:22px;text-align:center;cursor:pointer;transition:all .15s;background:var(--bg3)}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:var(--accent-glow)}
+.upload-zone .uz-icon{font-size:28px;margin-bottom:8px}
+.upload-zone p{font-size:.8rem;color:var(--text2);line-height:1.5}
+.upload-zone strong{color:var(--accent)}
+.upload-zone input[type=file]{display:none}
+
+/* ── Director / Cheque blocks ── */
+.dir-block{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:18px;margin-bottom:14px;position:relative}
+.dir-block .dir-title{font-size:.82rem;font-weight:700;color:var(--accent);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.chq-row{display:grid;grid-template-columns:32px 1fr 150px 150px;gap:10px;align-items:center;margin-bottom:8px}
+.chq-num{width:28px;height:28px;background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;flex-shrink:0}
+@media(max-width:700px){.chq-row{grid-template-columns:32px 1fr}}
+
+/* ── Calc strip ── */
+.calc-strip{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;background:rgba(46,204,113,.07);border:1px solid rgba(46,204,113,.2);border-radius:10px;padding:14px;margin-top:14px}
+.cs-item{text-align:center}
+.cs-lbl{font-size:.68rem;color:var(--green);font-weight:600;text-transform:uppercase;letter-spacing:.07em}
+.cs-val{font-size:1.05rem;font-weight:800;color:#fff;margin-top:3px}
+
+/* ── Asset grid ── */
+.asset-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+@media(max-width:900px){.asset-grid{grid-template-columns:1fr 1fr}}
+.asset-card{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:14px;text-align:center;cursor:pointer;transition:all .15s}
+.asset-card:hover{border-color:var(--accent);background:var(--accent-glow)}
+.asset-card .ac-icon{font-size:26px;margin-bottom:8px}
+.asset-card .ac-lbl{font-size:.72rem;font-weight:600;color:var(--text2)}
+.asset-card .ac-status{font-size:.67rem;margin-top:5px}
+.asset-card.uploaded .ac-lbl{color:var(--green)}
+.asset-card input[type=file]{display:none}
+
+/* ── Template list ── */
+.tmpl-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:.82rem}
+.tmpl-row:last-child{border-bottom:none}
+.tmpl-row .tr-label{flex:1;font-weight:500}
+.tmpl-row .tr-status{font-size:.72rem}
+
+/* ── Toast ── */
+#toast{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast-item{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:12px 18px;font-size:.82rem;display:flex;align-items:center;gap:10px;box-shadow:0 8px 32px rgba(0,0,0,.5);animation:slideIn .25s ease;pointer-events:auto;min-width:240px}
+.toast-item.success{border-color:rgba(46,204,113,.4)}
+.toast-item.error{border-color:rgba(232,84,84,.4)}
+@keyframes slideIn{from{transform:translateX(60px);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* ── Status bar ── */
+.status-bar{padding:12px 18px;border-radius:10px;font-size:.84rem;font-weight:500;display:none;align-items:center;gap:10px;margin-top:16px}
+.status-bar.show{display:flex}
+.status-bar.loading{background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.3);color:var(--accent)}
+.status-bar.success{background:rgba(46,204,113,.1);border:1px solid rgba(46,204,113,.3);color:var(--green)}
+.status-bar.error{background:rgba(232,84,84,.1);border:1px solid rgba(232,84,84,.3);color:var(--red)}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(79,142,247,.3);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:none;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius2);width:90%;max-width:560px;max-height:85vh;overflow-y:auto}
+.modal-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-header h3{font-size:.92rem;font-weight:600}
+.modal-body{padding:20px}
+.modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+.close-btn{background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:2px 6px;border-radius:4px}
+.close-btn:hover{color:var(--text);background:var(--bg3)}
+
+/* ── Party selector prominent ── */
+.party-selector-wrap{background:linear-gradient(135deg,rgba(79,142,247,.1),rgba(155,109,255,.08));border:1px solid rgba(79,142,247,.25);border-radius:var(--radius2);padding:18px 20px;margin-bottom:22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.party-selector-wrap label{font-size:.8rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap}
+.party-selector-wrap select{flex:1;min-width:200px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;font-size:.88rem;color:var(--text);outline:none;font-family:inherit}
+.party-selector-wrap select:focus{border-color:var(--accent)}
+.party-info-strip{display:flex;gap:12px;flex-wrap:wrap;margin-top:4px;width:100%}
+.pis-item{font-size:.74rem;color:var(--text2)}
+.pis-item strong{color:var(--text)}
+</style>
+
+</head>
+<body>
+<div class="shell">
+
+<!-- ══════════════ SIDEBAR ══════════════ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="icon">📄</div>
+    <div class="brand">LendDocs<span>Enterprise v2.0</span></div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Main</div>
+    <div class="nav-item active" data-page="dashboard"><span class="ni">🏠</span>Dashboard</div>
+    <div class="nav-item" data-page="generate"><span class="ni">⚡</span>Generate Docs</div>
+    <div class="nav-section">Management</div>
+    <div class="nav-item" data-page="parties"><span class="ni">🏦</span>Party Manager</div>
+    <div class="nav-item" data-page="templates"><span class="ni">📋</span>Templates</div>
+    <div class="nav-section">Records</div>
+    <div class="nav-item" data-page="history"><span class="ni">🕒</span>History</div>
+    <div class="nav-section">Info</div>
+    <div class="nav-item" data-page="variables"><span class="ni">🔑</span>Variables Guide</div>
+  </nav>
+  <div class="sidebar-footer"><div class="version-badge">Parshwa Capital © 2026</div></div>
+</aside>
+
+<!-- ══════════════ MAIN ══════════════ -->
+<div class="main">
+  <div class="topbar">
+    <h2 id="pageTitle">Dashboard</h2>
+    <div class="tb-badge" id="serverStatus">⟳ Connecting…</div>
+  </div>
+  <div class="content">
+
+    <!-- ══ DASHBOARD ══ -->
+    <div class="page active" id="page-dashboard">
+      <div class="stat-grid" id="statGrid">
+        <div class="stat-card"><div class="stat-icon blue">🏦</div><div><div class="stat-val" id="statParties">—</div><div class="stat-lbl">Active Parties</div></div></div>
+        <div class="stat-card"><div class="stat-icon purple">📋</div><div><div class="stat-val" id="statTemplates">—</div><div class="stat-lbl">Templates Uploaded</div></div></div>
+        <div class="stat-card"><div class="stat-icon green">📂</div><div><div class="stat-val" id="statDocs">—</div><div class="stat-lbl">Docs Generated</div></div></div>
+        <div class="stat-card"><div class="stat-icon yellow">💰</div><div><div class="stat-val" id="statAmount">—</div><div class="stat-lbl">Total Loan Value</div></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>📑 Recent Activity</h3><button class="btn btn-ghost btn-sm" onclick="loadHistory()">Refresh</button></div>
+        <div class="card-body"><div class="tbl-wrap">
+          <table><thead><tr><th>Borrower</th><th>Party</th><th>Amount</th><th>Docs</th><th>Date</th><th>Action</th></tr></thead>
+          <tbody id="recentRows"><tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px">Loading…</td></tr></tbody>
+          </table>
+        </div></div>
+      </div>
+      <div class="g2">
+        <div class="card">
+          <div class="card-header"><h3>🏦 Registered Parties</h3></div>
+          <div class="card-body"><div id="dashParties" style="font-size:.83rem;color:var(--text2)">Loading…</div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>🚀 Quick Actions</h3></div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+            <button class="btn btn-primary" onclick="nav('generate')">⚡ Generate Documents</button>
+            <button class="btn btn-ghost" onclick="nav('parties')">🏦 Add New Party / Lender</button>
+            <button class="btn btn-ghost" onclick="nav('templates')">📤 Upload DOCX Template</button>
+            <button class="btn btn-ghost" onclick="nav('history')">🕒 View History</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ══ GENERATE ══ -->
+    <div class="page" id="page-generate">
+
+      <!-- Party Selector -->
+      <div class="party-selector-wrap">
+        <label>🏦 Select Lender / Party</label>
+        <select id="selParty" onchange="onPartyChange()">
+          <option value="">— Select Party —</option>
+        </select>
+        <div class="party-info-strip" id="partyInfoStrip"></div>
+      </div>
+
+      <!-- Loan Details -->
+      <div class="card">
+        <div class="card-header"><h3>💰 Loan / Facility Details</h3></div>
+        <div class="card-body">
+          <div class="g3">
+            <div class="field"><label>BoE Amount (₹)</label><input type="number" id="boeAmount" placeholder="e.g. 2000000" oninput="recalc()"/></div>
+            <div class="field"><label>Rate (% per month)</label><input type="number" id="ratePercent" step="0.01" placeholder="e.g. 2.00" oninput="recalc()"/></div>
+            <div class="field"><label>Tenure (Months)</label><input type="number" id="tenureMonths" placeholder="e.g. 6" oninput="recalc()"/></div>
+          </div>
+          <div class="calc-strip" id="calcStrip" style="display:none">
+            <div class="cs-item"><div class="cs-lbl">Disc. Charges</div><div class="cs-val" id="csInt">—</div></div>
+            <div class="cs-item"><div class="cs-lbl">Net Disbursed</div><div class="cs-val" id="csNet">—</div></div>
+            <div class="cs-item"><div class="cs-lbl">BoE Amount</div><div class="cs-val" id="csBoe">—</div></div>
+          </div>
+          <div class="section-sep" style="margin-top:18px">Dates & Reference</div>
+          <div class="g3">
+            <div class="field"><label>Request Date</label><input type="date" id="requestDate"/></div>
+            <div class="field"><label>Disbursement Date</label><input type="date" id="disbursementDate"/></div>
+            <div class="field"><label>Board Resolution Date</label><input type="date" id="boardResDate"/></div>
+          </div>
+          <div class="g3" style="margin-top:14px">
+            <div class="field"><label>RTGS / UTR No.</label><input type="text" id="rtgsNo" placeholder="e.g. UTIB226547891234"/></div>
+            <div class="field"><label>RTGS Bank</label><input type="text" id="rtgsBank" placeholder="e.g. Axis Bank"/></div>
+            <div class="field"><label>Place</label><input type="text" id="place" placeholder="Mumbai"/></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lender (manual override if no party selected) -->
+      <div class="card" id="lenderCard">
+        <div class="card-header"><h3>🏦 Lender Details <span style="font-size:.72rem;color:var(--text3);font-weight:400">(auto-filled from selected party)</span></h3></div>
+        <div class="card-body">
+          <div class="g2">
+            <div class="field"><label>Lender Name</label><input type="text" id="lenderName" placeholder="Parshwa Capital Pvt Ltd"/></div>
+            <div class="field"><label>Lender PAN</label><input type="text" id="lenderPan" placeholder="AABCP1234Z"/></div>
+          </div>
+          <div class="section-sep" style="margin-top:14px">Lender Address Lines</div>
+          <div id="lenderAddrList"></div>
+          <button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="addAddr('lender')">＋ Add Line</button>
+        </div>
+      </div>
+
+      <!-- Company -->
+      <div class="card">
+        <div class="card-header"><h3>🏢 Borrower Company</h3></div>
+        <div class="card-body">
+          <div class="g2">
+            <div class="field"><label>Company Name</label><input type="text" id="companyName" placeholder="ABC Traders Pvt Ltd"/></div>
+            <div class="field"><label>Company PAN</label><input type="text" id="companyPan" placeholder="AABCA1234Z"/></div>
+          </div>
+          <div class="section-sep" style="margin-top:14px">Company Address Lines</div>
+          <div id="companyAddrList"></div>
+          <button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="addAddr('company')">＋ Add Line</button>
+        </div>
+      </div>
+
+      <!-- Directors -->
+      <div class="card">
+        <div class="card-header"><h3>👤 Directors / Partners</h3><button class="btn btn-ghost btn-sm" onclick="addDirector()">＋ Add Director</button></div>
+        <div class="card-body"><div id="directorList"></div></div>
+      </div>
+
+      <!-- Cheques -->
+      <div class="card">
+        <div class="card-header"><h3>📋 Post-Dated Cheques</h3><button class="btn btn-ghost btn-sm" onclick="addCheque()">＋ Add Cheque</button></div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:32px 1fr 150px 150px;gap:10px;margin-bottom:8px;font-size:.69rem;font-weight:700;color:var(--text3);text-transform:uppercase;padding:0 2px">
+            <div></div><div>Cheque No.</div><div>Date</div><div>Amount (₹)</div>
+          </div>
+          <div id="chequeList"></div>
+        </div>
+      </div>
+
+      <!-- Doc Selection -->
+      <div class="card">
+        <div class="card-header"><h3>📑 Select Documents to Generate</h3><button class="btn btn-ghost btn-sm" onclick="toggleAllDocs()">Toggle All</button></div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px" id="docCheckList"></div>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <div style="text-align:center;padding:8px 0 24px">
+        <button class="btn btn-generate" id="btnGen" onclick="doGenerate()">⚡ Generate All Documents</button>
+        <div class="status-bar" id="genStatus"></div>
+      </div>
+    </div>
+
+
+    <!-- ══ PARTIES ══ -->
+    <div class="page" id="page-parties">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+        <div style="font-size:.92rem;font-weight:600">Party / Lender Management</div>
+        <button class="btn btn-primary" onclick="openPartyModal()">＋ Add Party</button>
+      </div>
+      <div class="card">
+        <div class="card-body"><div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Name</th><th>Code</th><th>PAN</th><th>City</th><th>Assets</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="partiesRows"><tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px">Loading…</td></tr></tbody>
+          </table>
+        </div></div>
+      </div>
+      <!-- Party detail / assets panel -->
+      <div class="card" id="partyDetailPanel" style="display:none">
+        <div class="card-header">
+          <h3 id="partyDetailName">Party Assets</h3>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('partyDetailPanel').style.display='none'">✕ Close</button>
+        </div>
+        <div class="card-body">
+          <div class="asset-grid" id="assetGrid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ TEMPLATES ══ -->
+    <div class="page" id="page-templates">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:14px;flex-wrap:wrap">
+        <div style="font-size:.92rem;font-weight:600">Document Templates</div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <select id="tmplPartySelect" style="background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:8px 12px;font-size:.83rem;color:var(--text);outline:none;font-family:inherit" onchange="loadTemplates()">
+            <option value="">— Select Party —</option>
+          </select>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>📋 Template Library</h3><span style="font-size:.75rem;color:var(--text2)">Upload a .docx file with {{VARIABLE}} placeholders</span></div>
+        <div class="card-body">
+          <div id="tmplList" style="font-size:.83rem;color:var(--text3);padding:16px 0">Select a party above to manage templates.</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>📤 Upload Template</h3></div>
+        <div class="card-body">
+          <div class="g3" style="margin-bottom:16px">
+            <div class="field"><label>Party</label>
+              <select id="tmplUpParty" style="background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:.85rem;color:var(--text);outline:none;font-family:inherit">
+                <option value="">— Select Party —</option>
+              </select>
+            </div>
+            <div class="field"><label>Document Type</label>
+              <select id="tmplUpType" style="background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:.85rem;color:var(--text);outline:none;font-family:inherit">
+                <option value="">— Select Type —</option>
+              </select>
+            </div>
+            <div class="field"><label>DOCX File</label>
+              <input type="file" id="tmplFile" accept=".docx" style="background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:8px 12px;font-size:.83rem;color:var(--text)"/>
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="uploadTemplate()">📤 Upload Template</button>
+          <div class="status-bar" id="tmplStatus"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ HISTORY ══ -->
+    <div class="page" id="page-history">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+        <div style="font-size:.92rem;font-weight:600">Generation History</div>
+        <button class="btn btn-ghost btn-sm" onclick="loadHistory()">🔄 Refresh</button>
+      </div>
+      <div class="card">
+        <div class="card-body"><div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Borrower</th><th>Party</th><th>Amount</th><th>Documents</th><th>Generated</th><th>Download</th></tr></thead>
+            <tbody id="historyRows"><tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px">Loading…</td></tr></tbody>
+          </table>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- ══ VARIABLES GUIDE ══ -->
+    <div class="page" id="page-variables">
+      <div class="card">
+        <div class="card-header"><h3>🔑 Template Variable Reference</h3></div>
+        <div class="card-body">
+          <p style="font-size:.83rem;color:var(--text2);margin-bottom:16px">Use these placeholders in your DOCX templates. The system replaces them automatically when generating documents.</p>
+          <div id="varGuide"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /shell -->
+
+<!-- ══ MODALS ══ -->
+<div class="modal-overlay" id="partyModal">
+  <div class="modal">
+    <div class="modal-header"><h3 id="partyModalTitle">Add Party / Lender</h3><button class="close-btn" onclick="closePartyModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="g2" style="gap:14px">
+        <div class="field"><label>Party Name *</label><input type="text" id="pm_name" placeholder="Parshwa Capital Pvt Ltd"/></div>
+        <div class="field"><label>Short Code *</label><input type="text" id="pm_code" placeholder="PARSHWA" style="text-transform:uppercase"/></div>
+        <div class="field"><label>PAN</label><input type="text" id="pm_pan" placeholder="AABCP1234Z"/></div>
+        <div class="field"><label>GST</label><input type="text" id="pm_gst" placeholder="27AABCP1234Z1Z5"/></div>
+        <div class="field"><label>Phone</label><input type="text" id="pm_phone" placeholder="9876543210"/></div>
+        <div class="field"><label>Email</label><input type="email" id="pm_email" placeholder="info@parshwa.com"/></div>
+        <div class="field"><label>City</label><input type="text" id="pm_city" placeholder="Mumbai"/></div>
+        <div class="field"><label>State</label><input type="text" id="pm_state" placeholder="Maharashtra"/></div>
+      </div>
+      <div class="field" style="margin-top:14px"><label>Full Address</label><textarea id="pm_address" rows="2" placeholder="101 Finance House, Marine Lines"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closePartyModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveParty()">💾 Save Party</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast"></div>
+
+
+<script>
+// ══════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════
+let lenderAddrs  = [];
+let companyAddrs = [];
+let directors    = [];
+let cheques      = [];
+let allParties   = [];
+let docTypes     = [];
+let editPartyId  = null;
+
+const DOC_LABELS = {
+  request_letter:'Request Letter', authority_letter:'Authority Letter',
+  receipt:'Receipt', board_resolution:'Board Resolution',
+  personal_undertaking:'Personal Undertaking', company_undertaking:'Company Undertaking',
+  bill_of_exchange:'Bill of Exchange', promissory_note:'Promissory Note',
+  guarantee:'Guarantee Letter', declaration:'Declaration'
+};
+
+// ══════════════════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════════════════
+function nav(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelector(`[data-page="${page}"]`).classList.add('active');
+  const titles = {dashboard:'Dashboard',generate:'Generate Documents',parties:'Party Manager',templates:'Templates',history:'History',variables:'Variables Guide'};
+  document.getElementById('pageTitle').textContent = titles[page] || page;
+  if (page==='dashboard') loadDashboard();
+  if (page==='parties')   loadParties();
+  if (page==='history')   loadHistory();
+  if (page==='templates') loadTemplateParties();
+  if (page==='variables') loadVarGuide();
+}
+document.querySelectorAll('.nav-item').forEach(el => el.addEventListener('click', () => nav(el.dataset.page)));
+
+// ══════════════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════════════
+function toast(msg, type='success') {
+  const c = document.getElementById('toast');
+  const el = document.createElement('div');
+  el.className = `toast-item ${type}`;
+  el.innerHTML = `<span>${type==='success'?'✅':type==='error'?'❌':'ℹ️'}</span> ${msg}`;
+  c.appendChild(el);
+  setTimeout(() => { el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(), 300); }, 3500);
+}
+
+function setStatus(id, type, msg) {
+  const el = document.getElementById(id);
+  el.className = `status-bar show ${type}`;
+  el.innerHTML = type==='loading'?`<span class="spin"></span>${msg}`:msg;
+}
+function clearStatus(id) { document.getElementById(id).className='status-bar'; }
+
+// ══════════════════════════════════════════════════
+//  SERVER HEALTH
+// ══════════════════════════════════════════════════
+async function checkHealth() {
+  try {
+    const r = await fetch('/api/health');
+    const d = await r.json();
+    document.getElementById('serverStatus').textContent = `✅ Server v${d.version}`;
+    document.getElementById('serverStatus').style.color = 'var(--green)';
+  } catch { document.getElementById('serverStatus').textContent = '❌ Server Offline'; document.getElementById('serverStatus').style.color='var(--red)'; }
+}
+
+// ══════════════════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════════════════
+async function loadDashboard() {
+  try {
+    const [pRes, hRes] = await Promise.all([fetch('/api/parties'), fetch('/api/history')]);
+    const pData = await pRes.json();
+    const hData = await hRes.json();
+    allParties = pData.parties || [];
+    const hist = hData.history || [];
+
+    document.getElementById('statParties').textContent = allParties.filter(p=>p.active).length;
+    document.getElementById('statDocs').textContent = hist.length;
+    const total = hist.reduce((a,h)=>a+(h.loan_amount||0),0);
+    document.getElementById('statAmount').textContent = total > 0 ? '₹'+Math.round(total/100000)+'L' : '₹0';
+
+    // Count templates total
+    let tmplCount = 0;
+    for (const p of allParties.slice(0,5)) {
+      try { const r2 = await fetch(`/api/templates/party/${p.id}`); const d2=await r2.json(); tmplCount += (d2.templates||[]).filter(t=>t.uploaded).length; } catch(_){}
+    }
+    document.getElementById('statTemplates').textContent = tmplCount;
+
+    // Recent rows
+    const tbody = document.getElementById('recentRows');
+    if (!hist.length) { tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:20px">No history yet</td></tr>'; }
+    else {
+      tbody.innerHTML = hist.slice(0,8).map(h=>`
+        <tr>
+          <td><strong>${h.borrower||'—'}</strong></td>
+          <td>${h.party_name||'—'}</td>
+          <td>₹${Number(h.loan_amount||0).toLocaleString('en-IN')}</td>
+          <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.75rem;color:var(--text2)">${h.doc_types||'—'}</td>
+          <td style="font-size:.75rem;color:var(--text2)">${new Date(h.created_at).toLocaleDateString('en-IN')}</td>
+          <td><a href="/api/history/${h.id}/download" class="btn btn-ghost btn-sm">⬇ ZIP</a></td>
+        </tr>`).join('');
+    }
+
+    // Dash parties
+    document.getElementById('dashParties').innerHTML = allParties.length
+      ? allParties.map(p=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:.82rem"><span style="background:var(--accent-glow);color:var(--accent);border-radius:5px;padding:2px 8px;font-size:.7rem;font-weight:700">${p.short_code}</span><span>${p.name}</span>${p.active?'<span class="badge badge-green" style="margin-left:auto">Active</span>':'<span class="badge badge-red" style="margin-left:auto">Inactive</span>'}</div>`).join('')
+      : 'No parties yet.';
+
+  } catch(e) { console.error(e); }
+}
+
+// ══════════════════════════════════════════════════
+//  PARTIES PAGE
+// ══════════════════════════════════════════════════
+async function loadParties() {
+  const res  = await fetch('/api/parties');
+  const data = await res.json();
+  allParties = data.parties || [];
+  const tbody = document.getElementById('partiesRows');
+  if (!allParties.length) { tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px">No parties yet. Add your first party!</td></tr>'; return; }
+  tbody.innerHTML = allParties.map(p => {
+    const assets = [p.logo_path,p.letterhead_path,p.footer_path,p.signature_path,p.stamp_path].filter(Boolean).length;
+    return `<tr>
+      <td><strong>${p.name}</strong></td>
+      <td><span class="badge badge-blue">${p.short_code}</span></td>
+      <td style="font-size:.78rem;color:var(--text2)">${p.pan||'—'}</td>
+      <td style="font-size:.78rem">${p.city||'—'}</td>
+      <td><span class="badge ${assets>=3?'badge-green':'badge-yellow'}">${assets}/5 assets</span></td>
+      <td>${p.active?'<span class="badge badge-green">Active</span>':'<span class="badge badge-red">Inactive</span>'}</td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="openAssets('${p.id}','${p.name}')">🖼 Assets</button>
+        <button class="btn btn-ghost btn-sm" onclick="editParty('${p.id}')">✏️ Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteParty('${p.id}','${p.name}')">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+  refreshPartyDropdowns();
+}
+
+function openPartyModal(id) {
+  editPartyId = id || null;
+  document.getElementById('partyModalTitle').textContent = id ? 'Edit Party' : 'Add Party / Lender';
+  ['pm_name','pm_code','pm_pan','pm_gst','pm_phone','pm_email','pm_city','pm_state','pm_address'].forEach(f => document.getElementById(f).value='');
+  if (id) {
+    const p = allParties.find(x=>x.id===id);
+    if (p) {
+      document.getElementById('pm_name').value    = p.name||'';
+      document.getElementById('pm_code').value    = p.short_code||'';
+      document.getElementById('pm_pan').value     = p.pan||'';
+      document.getElementById('pm_gst').value     = p.gst||'';
+      document.getElementById('pm_phone').value   = p.phone||'';
+      document.getElementById('pm_email').value   = p.email||'';
+      document.getElementById('pm_city').value    = p.city||'';
+      document.getElementById('pm_state').value   = p.state||'';
+      document.getElementById('pm_address').value = p.address||'';
+    }
+  }
+  document.getElementById('partyModal').classList.add('open');
+}
+function editParty(id) { openPartyModal(id); }
+function closePartyModal() { document.getElementById('partyModal').classList.remove('open'); editPartyId=null; }
+
+async function saveParty() {
+  const data = {
+    name: document.getElementById('pm_name').value.trim(),
+    short_code: document.getElementById('pm_code').value.trim().toUpperCase(),
+    pan: document.getElementById('pm_pan').value.trim(),
+    gst: document.getElementById('pm_gst').value.trim(),
+    phone: document.getElementById('pm_phone').value.trim(),
+    email: document.getElementById('pm_email').value.trim(),
+    city: document.getElementById('pm_city').value.trim(),
+    state: document.getElementById('pm_state').value.trim(),
+    address: document.getElementById('pm_address').value.trim(),
+  };
+  if (!data.name || !data.short_code) { toast('Name and Short Code are required','error'); return; }
+  const url    = editPartyId ? `/api/parties/${editPartyId}` : '/api/parties';
+  const method = editPartyId ? 'PUT' : 'POST';
+  const res    = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+  const d = await res.json();
+  if (d.ok) { toast(editPartyId?'Party updated!':'Party added!'); closePartyModal(); loadParties(); }
+  else toast(d.error||'Error saving party','error');
+}
+
+async function deleteParty(id, name) {
+  if (!confirm(`Deactivate party "${name}"?`)) return;
+  await fetch(`/api/parties/${id}`, { method:'DELETE' });
+  toast('Party deactivated'); loadParties();
+}
+</script>
+
+<script>
+// ══════════════════════════════════════════════════
+//  ASSETS PANEL
+// ══════════════════════════════════════════════════
+let currentPartyId = null;
+const ASSETS = [
+  { key:'logo',       field:'logo_path',       label:'Logo',       icon:'🏷️',  accept:'image/*' },
+  { key:'letterhead', field:'letterhead_path',  label:'Letterhead', icon:'📄',  accept:'image/*,.pdf,.docx' },
+  { key:'footer',     field:'footer_path',      label:'Footer',     icon:'📑',  accept:'image/*,.pdf' },
+  { key:'signature',  field:'signature_path',   label:'Signature',  icon:'✍️',  accept:'image/*' },
+  { key:'stamp',      field:'stamp_path',       label:'Stamp',      icon:'🔏',  accept:'image/*' },
+];
+
+function openAssets(partyId, partyName) {
+  currentPartyId = partyId;
+  document.getElementById('partyDetailName').textContent = `🖼 Assets — ${partyName}`;
+  const panel = document.getElementById('partyDetailPanel');
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior:'smooth', block:'start' });
+  const party = allParties.find(p=>p.id===partyId);
+  const grid  = document.getElementById('assetGrid');
+  grid.innerHTML = ASSETS.map(a => {
+    const uploaded = !!(party && party[a.field]);
+    return `<div class="asset-card ${uploaded?'uploaded':''}" onclick="document.getElementById('file_${a.key}').click()">
+      <div class="ac-icon">${a.icon}</div>
+      <div class="ac-lbl">${a.label}</div>
+      <div class="ac-status">${uploaded?'<span class="badge badge-green">✓ Uploaded</span>':'<span class="badge badge-yellow">Not uploaded</span>'}</div>
+      ${uploaded?`<div style="font-size:.65rem;color:var(--text3);margin-top:4px;word-break:break-all">${(party[a.field]||'').split('/').pop()}</div>`:''}
+      <input type="file" id="file_${a.key}" accept="${a.accept}" onchange="uploadAsset('${a.key}',this)"/>
+    </div>`;
+  }).join('');
+}
+
+async function uploadAsset(key, input) {
+  if (!input.files[0] || !currentPartyId) return;
+  const fd = new FormData();
+  fd.append(key, input.files[0]);
+  const res = await fetch(`/api/parties/${currentPartyId}/${key}`, { method:'POST', body:fd });
+  const d = await res.json();
+  if (d.ok) { toast(`${key.charAt(0).toUpperCase()+key.slice(1)} uploaded!`); await loadParties(); openAssets(currentPartyId, allParties.find(p=>p.id===currentPartyId)?.name||''); }
+  else toast(d.error||'Upload failed','error');
+}
+
+// ══════════════════════════════════════════════════
+//  TEMPLATES PAGE
+// ══════════════════════════════════════════════════
+async function loadTemplateParties() {
+  const res  = await fetch('/api/parties/active');
+  const data = await res.json();
+  const sel1 = document.getElementById('tmplPartySelect');
+  const sel2 = document.getElementById('tmplUpParty');
+  const opts = (data.parties||[]).map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  sel1.innerHTML = '<option value="">— Select Party —</option>' + opts;
+  sel2.innerHTML = '<option value="">— Select Party —</option>' + opts;
+
+  // Load doc types
+  const r2 = await fetch('/api/templates/doctypes');
+  const d2 = await r2.json();
+  docTypes = d2.types || [];
+  const sel3 = document.getElementById('tmplUpType');
+  sel3.innerHTML = '<option value="">— Select Type —</option>' + docTypes.map(t=>`<option value="${t.value}">${t.label}</option>`).join('');
+}
+
+async function loadTemplates() {
+  const partyId = document.getElementById('tmplPartySelect').value;
+  if (!partyId) { document.getElementById('tmplList').innerHTML='<div style="color:var(--text3);padding:12px 0">Select a party to see templates.</div>'; return; }
+  const res  = await fetch(`/api/templates/party/${partyId}`);
+  const data = await res.json();
+  const list = data.templates || [];
+  document.getElementById('tmplList').innerHTML = list.map(t => `
+    <div class="tmpl-row">
+      <div style="width:28px;text-align:center">${t.uploaded?'✅':'⬜'}</div>
+      <div class="tr-label">${t.label}</div>
+      <div style="font-size:.72rem;color:var(--text3);font-family:monospace">{{${t.doc_type.toUpperCase()}}}</div>
+      ${t.uploaded
+        ? `<a href="${t.template.url}" target="_blank" class="btn btn-ghost btn-sm">⬇ Download</a>
+           <button class="btn btn-danger btn-sm" onclick="deleteTemplate('${t.template.id}')">🗑</button>`
+        : `<span class="badge badge-yellow">Not uploaded</span>`}
+    </div>`).join('');
+}
+
+async function uploadTemplate() {
+  const partyId = document.getElementById('tmplUpParty').value;
+  const docType = document.getElementById('tmplUpType').value;
+  const file    = document.getElementById('tmplFile').files[0];
+  if (!partyId || !docType || !file) { toast('Select party, doc type, and file','error'); return; }
+  setStatus('tmplStatus','loading','Uploading template…');
+  const fd = new FormData();
+  fd.append('template', file);
+  fd.append('doc_type', docType);
+  const res = await fetch(`/api/templates/party/${partyId}/upload`, { method:'POST', body:fd });
+  const d = await res.json();
+  if (d.ok) { toast('Template uploaded!'); clearStatus('tmplStatus'); loadTemplates(); }
+  else { setStatus('tmplStatus','error','❌ '+( d.error||'Upload failed')); }
+}
+
+async function deleteTemplate(id) {
+  if (!confirm('Delete this template?')) return;
+  await fetch(`/api/templates/${id}`, { method:'DELETE' });
+  toast('Template deleted'); loadTemplates();
+}
+
+// ══════════════════════════════════════════════════
+//  HISTORY
+// ══════════════════════════════════════════════════
+async function loadHistory() {
+  const res  = await fetch('/api/history');
+  const data = await res.json();
+  const hist = data.history || [];
+  const tbody = document.getElementById('historyRows');
+  if (!hist.length) { tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px">No documents generated yet.</td></tr>'; return; }
+  tbody.innerHTML = hist.map(h=>`
+    <tr>
+      <td><strong>${h.borrower||'—'}</strong></td>
+      <td>${h.party_name||'—'}</td>
+      <td>₹${Number(h.loan_amount||0).toLocaleString('en-IN')}</td>
+      <td style="max-width:220px;font-size:.74rem;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h.doc_types||'—'}</td>
+      <td style="font-size:.75rem;color:var(--text2)">${new Date(h.created_at).toLocaleString('en-IN')}</td>
+      <td><a href="/api/history/${h.id}/download" class="btn btn-success btn-sm">⬇ ZIP</a></td>
+    </tr>`).join('');
+}
+</script>
+
+<script>
+// ══════════════════════════════════════════════════
+//  GENERATE PAGE — HELPERS
+// ══════════════════════════════════════════════════
+function addAddr(type) {
+  const arr  = type==='lender' ? lenderAddrs : companyAddrs;
+  const list = document.getElementById(type+'AddrList');
+  const idx  = arr.length; arr.push('');
+  const row = document.createElement('div');
+  row.style.cssText='display:flex;gap:8px;margin-bottom:8px';
+  row.innerHTML=`
+    <input type="text" placeholder="Address line ${idx+1}" value=""
+      style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:.85rem;color:var(--text);outline:none;font-family:inherit"
+      oninput="${type==='lender'?'lenderAddrs':'companyAddrs'}[${idx}]=this.value"/>
+    <button onclick="this.parentNode.remove();${type==='lender'?'lenderAddrs':'companyAddrs'}.splice(${idx},1)"
+      style="background:rgba(232,84,84,.15);color:var(--red);border:1px solid rgba(232,84,84,.3);border-radius:6px;padding:0 12px;cursor:pointer;font-weight:700">×</button>`;
+  list.appendChild(row);
+}
+
+function addDirector() {
+  const idx = directors.length;
+  directors.push({ name:'', aadhaar:'', pan:'', mobile:'', address:[] });
+  const list = document.getElementById('directorList');
+  const block = document.createElement('div');
+  block.className='dir-block'; block.id=`dir-${idx}`;
+  block.innerHTML=`
+    <div class="dir-title"><span>Director ${idx+1}</span>${idx>0?`<button class="btn btn-danger btn-sm" onclick="removeDir(${idx})">Remove</button>`:''}</div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field"><label>Full Name</label><input type="text" placeholder="Rajesh Kumar Shah" oninput="directors[${idx}].name=this.value"/></div>
+      <div class="field"><label>Mobile</label><input type="text" placeholder="9876543210" oninput="directors[${idx}].mobile=this.value"/></div>
+      <div class="field"><label>Aadhaar No.</label><input type="text" placeholder="1234 5678 9012" oninput="directors[${idx}].aadhaar=this.value"/></div>
+      <div class="field"><label>PAN No.</label><input type="text" placeholder="ABCDE1234F" oninput="directors[${idx}].pan=this.value"/></div>
+    </div>
+    <div style="font-size:.7rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Personal Address</div>
+    <div id="dir-addr-${idx}"></div>
+    <button class="btn btn-ghost btn-sm" style="margin-top:4px" onclick="addDirAddr(${idx})">＋ Add Address Line</button>`;
+  list.appendChild(block);
+  addDirAddr(idx);
+}
+
+function removeDir(idx) { directors.splice(idx,1); document.getElementById(`dir-${idx}`).remove(); }
+
+function addDirAddr(dirIdx) {
+  const aIdx = directors[dirIdx].address.length;
+  directors[dirIdx].address.push('');
+  const c = document.getElementById(`dir-addr-${dirIdx}`);
+  const row = document.createElement('div');
+  row.style.cssText='display:flex;gap:8px;margin-bottom:8px';
+  row.innerHTML=`
+    <input type="text" placeholder="Address line ${aIdx+1}"
+      style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:.85rem;color:var(--text);outline:none;font-family:inherit"
+      oninput="directors[${dirIdx}].address[${aIdx}]=this.value"/>
+    <button onclick="this.parentNode.remove();directors[${dirIdx}].address.splice(${aIdx},1)"
+      style="background:rgba(232,84,84,.15);color:var(--red);border:1px solid rgba(232,84,84,.3);border-radius:6px;padding:0 12px;cursor:pointer;font-weight:700">×</button>`;
+  c.appendChild(row);
+}
+
+function addCheque() {
+  if (cheques.length>=10) return;
+  const idx = cheques.length; cheques.push({no:'',date:'',amount:''});
+  const list = document.getElementById('chequeList');
+  const row  = document.createElement('div'); row.className='chq-row'; row.id=`chq-${idx}`;
+  row.innerHTML=`
+    <div class="chq-num">${idx+1}</div>
+    <input type="text" placeholder="Cheque No."
+      style="background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:.85rem;color:var(--text);width:100%;outline:none;font-family:inherit"
+      oninput="cheques[${idx}].no=this.value"/>
+    <input type="date"
+      style="background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:9px 10px;font-size:.83rem;color:var(--text);width:100%;outline:none;font-family:inherit"
+      oninput="cheques[${idx}].date=this.value"/>
+    <input type="number" placeholder="Amount"
+      style="background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:.85rem;color:var(--text);width:100%;outline:none;font-family:inherit"
+      oninput="cheques[${idx}].amount=this.value"/>`;
+  list.appendChild(row);
+}
+
+function buildDocChecks() {
+  const allTypes = [
+    {v:'request_letter',l:'1 · Request Letter'},{v:'authority_letter',l:'2 · Authority Letter'},
+    {v:'receipt',l:'3 · Receipt'},{v:'bill_of_exchange',l:'4 · Bill of Exchange'},
+    {v:'board_resolution',l:'5 · Board Resolution'},{v:'personal_undertaking',l:'6+ · Personal Undertaking'},
+    {v:'company_undertaking',l:'9 · Company Undertaking'},{v:'promissory_note',l:'10 · Promissory Note'},
+    {v:'guarantee',l:'Guarantee Letter'},{v:'declaration',l:'Declaration'},
+  ];
+  document.getElementById('docCheckList').innerHTML = allTypes.map(t=>`
+    <label style="display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;cursor:pointer;font-size:.82rem">
+      <input type="checkbox" value="${t.v}" checked style="accent-color:var(--accent);width:15px;height:15px"/>
+      ${t.l}
+    </label>`).join('');
+}
+
+function toggleAllDocs() {
+  const boxes = document.querySelectorAll('#docCheckList input[type=checkbox]');
+  const allChecked = [...boxes].every(b=>b.checked);
+  boxes.forEach(b=>b.checked=!allChecked);
+}
+
+function recalc() {
+  const amt=parseFloat(document.getElementById('boeAmount').value)||0;
+  const rate=parseFloat(document.getElementById('ratePercent').value)||0;
+  const m=parseFloat(document.getElementById('tenureMonths').value)||0;
+  if (!amt||!rate||!m) { document.getElementById('calcStrip').style.display='none'; return; }
+  const interest=Math.round(amt*(rate/100)*m);
+  const net=amt-interest;
+  document.getElementById('csInt').textContent='₹'+interest.toLocaleString('en-IN');
+  document.getElementById('csNet').textContent='₹'+net.toLocaleString('en-IN');
+  document.getElementById('csBoe').textContent='₹'+amt.toLocaleString('en-IN');
+  document.getElementById('calcStrip').style.display='grid';
+}
+
+function fmtDate(d) { if(!d)return''; const [y,m,dd]=d.split('-'); return`${dd}/${m}/${y}`; }
+
+async function refreshPartyDropdowns() {
+  const res  = await fetch('/api/parties/active');
+  const data = await res.json();
+  allParties  = data.parties || [];
+  const sel   = document.getElementById('selParty');
+  const cur   = sel.value;
+  sel.innerHTML = '<option value="">— No Party / Manual Entry —</option>' +
+    allParties.map(p=>`<option value="${p.id}">${p.name} (${p.short_code})</option>`).join('');
+  if (cur) sel.value = cur;
+}
+
+async function onPartyChange() {
+  const partyId = document.getElementById('selParty').value;
+  document.getElementById('partyInfoStrip').innerHTML='';
+  if (!partyId) return;
+  const res  = await fetch(`/api/parties/${partyId}`);
+  const data = await res.json();
+  const p    = data.party;
+  if (!p) return;
+  // Auto-fill lender fields
+  document.getElementById('lenderName').value = p.name||'';
+  document.getElementById('lenderPan').value  = p.pan||'';
+  // Clear & rebuild lender address
+  lenderAddrs = [];
+  document.getElementById('lenderAddrList').innerHTML='';
+  const addrParts = (p.address||'').split('\n').filter(Boolean);
+  addrParts.forEach(line => { addAddr('lender'); lenderAddrs[lenderAddrs.length-1]=line; document.querySelector(`#lenderAddrList div:last-child input`).value=line; });
+  if (!addrParts.length) addAddr('lender');
+  // Info strip
+  document.getElementById('partyInfoStrip').innerHTML=`
+    <span class="pis-item"><strong>PAN:</strong> ${p.pan||'—'}</span>
+    <span class="pis-item"><strong>GST:</strong> ${p.gst||'—'}</span>
+    <span class="pis-item"><strong>City:</strong> ${p.city||'—'}</span>
+    <span class="pis-item"><strong>Templates:</strong> <span id="partyTmplCount">checking…</span></span>`;
+  // Template count
+  try {
+    const tr = await fetch(`/api/templates/party/${partyId}`);
+    const td = await tr.json();
+    const up = (td.templates||[]).filter(t=>t.uploaded).length;
+    document.getElementById('partyTmplCount').textContent = `${up} uploaded`;
+    document.getElementById('partyTmplCount').style.color = up>0?'var(--green)':'var(--yellow)';
+  } catch(_) {}
+}
+</script>
+
+<script>
+// ══════════════════════════════════════════════════
+//  GENERATE — MAIN
+// ══════════════════════════════════════════════════
+async function doGenerate() {
+  const btn = document.getElementById('btnGen');
+  const lName = document.getElementById('lenderName').value.trim();
+  const cName = document.getElementById('companyName').value.trim();
+  const boeAmt= parseFloat(document.getElementById('boeAmount').value);
+
+  if (!lName)  { toast('Lender name required','error'); return; }
+  if (!cName)  { toast('Company name required','error'); return; }
+  if (!boeAmt) { toast('BoE Amount required','error'); return; }
+  if (!directors.length || !directors[0].name) { toast('At least one director required','error'); return; }
+
+  const selectedDocs = [...document.querySelectorAll('#docCheckList input:checked')].map(b=>b.value);
+
+  const payload = {
+    partyId: document.getElementById('selParty').value || null,
+    selectedDocs,
+    lender: {
+      name:    lName,
+      pan:     document.getElementById('lenderPan').value.trim(),
+      address: lenderAddrs.filter(a=>a.trim()),
+    },
+    company: {
+      name:    cName,
+      pan:     document.getElementById('companyPan').value.trim(),
+      address: companyAddrs.filter(a=>a.trim()),
+    },
+    loan: {
+      boeAmount:        boeAmt,
+      ratePercent:      parseFloat(document.getElementById('ratePercent').value)||0,
+      tenureMonths:     parseInt(document.getElementById('tenureMonths').value)||0,
+      requestDate:      fmtDate(document.getElementById('requestDate').value),
+      disbursementDate: fmtDate(document.getElementById('disbursementDate').value),
+      boardResDate:     fmtDate(document.getElementById('boardResDate').value),
+      rtgsNo:           document.getElementById('rtgsNo').value.trim(),
+      rtgsBank:         document.getElementById('rtgsBank').value.trim(),
+      place:            document.getElementById('place').value.trim()||'Mumbai',
+    },
+    directors: directors.filter(d=>d.name.trim()).map(d=>({...d,address:d.address.filter(a=>a.trim())})),
+    cheques:   cheques.filter(c=>c.no||c.amount),
+  };
+
+  btn.disabled = true;
+  setStatus('genStatus','loading','⟳ Generating documents, please wait…');
+
+  try {
+    const res = await fetch('/api/generate', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const e = await res.json().catch(()=>({error:`Server error ${res.status}`}));
+      throw new Error(e.error||e.message||'Unknown error');
+    }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `BoE_${cName.split(' ').slice(0,3).join('_')}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setStatus('genStatus','success','✅ Documents generated! ZIP download started.');
+    toast('Documents generated successfully!');
+  } catch(e) {
+    setStatus('genStatus','error','❌ '+e.message);
+    toast(e.message,'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  VARIABLES GUIDE
+// ══════════════════════════════════════════════════
+function loadVarGuide() {
+  const groups = [
+    { title:'🏦 Lender', vars:['LENDER_NAME','LENDER_PAN','LENDER_ADDRESS'] },
+    { title:'🏢 Company', vars:['COMPANY_NAME','COMPANY_PAN','COMPANY_ADDRESS'] },
+    { title:'👤 Director / Borrower', vars:['BORROWER_NAME','DIRECTOR_NAME','DIRECTOR_AADHAAR','DIRECTOR_PAN','DIRECTOR_MOBILE','DIRECTOR_ADDRESS','ALL_DIRECTORS','DIRECTOR_SIGS'] },
+    { title:'💰 Loan', vars:['LOAN_AMOUNT','LOAN_AMOUNT_FMT','LOAN_AMOUNT_WORDS','INTEREST_AMOUNT','INTEREST_AMOUNT_FMT','INTEREST_AMOUNT_WORDS','NET_DISBURSED','NET_DISBURSED_FMT','NET_DISBURSED_WORDS','RATE_PERCENT','TENURE_MONTHS'] },
+    { title:'📅 Dates', vars:['REQUEST_DATE','DISBURSEMENT_DATE','BOARD_RES_DATE','BOARD_DATE'] },
+    { title:'🏦 Payment', vars:['RTGS_NO','RTGS_BANK','PLACE'] },
+    { title:'📋 Cheques', vars:['CHEQUE_TABLE'] },
+  ];
+  document.getElementById('varGuide').innerHTML = groups.map(g=>`
+    <div style="margin-bottom:18px">
+      <div style="font-size:.78rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">${g.title}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${g.vars.map(v=>`
+          <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:7px 12px;font-size:.78rem;font-family:monospace;cursor:pointer;user-select:all;transition:border-color .15s"
+               onclick="navigator.clipboard.writeText('{{${v}}}');toast('Copied: {{${v}}}');"
+               title="Click to copy">
+            <span style="color:var(--yellow)">{{</span><span style="color:var(--text)">${v}</span><span style="color:var(--yellow)">}}</span>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', async () => {
+  checkHealth();
+
+  // Set today's date as defaults
+  const today = new Date().toISOString().split('T')[0];
+  ['requestDate','disbursementDate','boardResDate'].forEach(id => document.getElementById(id).value=today);
+
+  // Init generate page
+  addAddr('lender');
+  addAddr('company');
+  addDirector();
+  addCheque(); addCheque(); addCheque();
+  buildDocChecks();
+
+  // Load parties into dropdowns
+  await refreshPartyDropdowns();
+
+  // Load dashboard
+  loadDashboard();
+});
+</script>
+</body>
+</html>
