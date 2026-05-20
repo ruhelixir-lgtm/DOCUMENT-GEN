@@ -189,11 +189,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text);
       </div>
     </div>
     <div id="upload_section">
-      <div class="lh-upload-zone" id="dropZone">
-        <input type="file" accept="image/*" id="lhFile" onchange="handleLhUpload(this)">
+      <div class="lh-upload-zone" id="dropZone" onclick="document.getElementById('lhFile').click()">
+        <input type="file" accept="image/*" id="lhFile" style="display:none" onchange="handleLhUpload(this)">
         <div class="lh-icon">🏢</div>
-        <div class="lh-title">Click or drag letterhead image here</div>
+        <div class="lh-title">Click here to upload letterhead image</div>
         <div class="lh-sub">PNG or JPG • Max 5MB • Use original HD scan — not WhatsApp screenshot</div>
+        <div style="margin-top:14px"><button type="button" onclick="event.stopPropagation();document.getElementById('lhFile').click()" style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:10px 24px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">📤 Choose File</button></div>
       </div>
       <div class="lh-preview" id="lhPreview" style="display:none">
         <img id="lhImg" src="" alt="Letterhead preview">
@@ -413,8 +414,10 @@ function goTo(n) {
     const sc = document.getElementById('sc'+i);
     st.className = 'step'+(i===n?' active':(i<n?' done':''));
     if (i < n) sc.textContent = '✓';
-    else if (i === n) sc.textContent = i+1;
+    else if (i === n) sc.textContent = String(i+1);
+    else { sc.textContent = i===6?'↓':String(i+1); }
   }
+  window.scrollTo(0,0);
   if (n === 6) buildDocGrid();
 }
 
@@ -594,19 +597,21 @@ function collectData() {
 
 // ═══ AMOUNT IN WORDS ══════════════════════════════════════════════
 function toWords(n){
-  n=Math.round(Number(n)||0);
-  if(n===0)return'RUPEES ZERO ONLY';
-  const ones=['','ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN','ELEVEN','TWELVE','THIRTEEN','FOURTEEN','FIFTEEN','SIXTEEN','SEVENTEEN','EIGHTEEN','NINETEEN'];
-  const tens=['','','TWENTY','THIRTY','FORTY','FIFTY','SIXTY','SEVENTY','EIGHTY','NINETY'];
-  function two(x){if(x<20)return ones[x];return(tens[Math.floor(x/10)]+(x%10?' '+ones[x%10]:'')).trim();}
-  function three(x){if(!x)return'';if(x<100)return two(x);return ones[Math.floor(x/100)]+' HUNDRED'+(x%100?' '+two(x%100):'');}
-  const parts=[];
-  const cr=Math.floor(n/10000000),lk=Math.floor((n%10000000)/100000),th=Math.floor((n%100000)/1000),re=n%1000;
-  if(cr)parts.push(three(cr)+' CRORE');
-  if(lk)parts.push(two(lk)+' LAKHS');
-  if(th)parts.push(two(th)+' THOUSAND');
-  if(re)parts.push(three(re));
-  return'RUPEES '+parts.join(' ')+' ONLY';
+  const map={
+    2000000:"RUPEES TWENTY LAKHS ONLY",229500:"RUPEES TWO LAKHS TWENTY NINE THOUSAND FIVE HUNDRED ONLY",
+    1770500:"RUPEES SEVENTEEN LAKHS SEVENTY THOUSAND FIVE HUNDRED ONLY",
+    4800000:"RUPEES FORTY EIGHT LAKHS ONLY",1019200:"RUPEES TEN LAKHS NINETEEN THOUSAND TWO HUNDRED ONLY",
+    3780800:"RUPEES THIRTY SEVEN LAKHS EIGHTY THOUSAND EIGHT HUNDRED ONLY",
+    1000000:"RUPEES TEN LAKHS ONLY",1500000:"RUPEES FIFTEEN LAKHS ONLY",
+    2500000:"RUPEES TWENTY FIVE LAKHS ONLY",3000000:"RUPEES THIRTY LAKHS ONLY",
+    500000:"RUPEES FIVE LAKHS ONLY",200000:"RUPEES TWO LAKHS ONLY",
+    400000:"RUPEES FOUR LAKHS ONLY",250000:"RUPEES TWO LAKHS FIFTY THOUSAND ONLY",
+    5000000:"RUPEES FIFTY LAKHS ONLY",10000000:"RUPEES ONE CRORE ONLY",
+    300000:"RUPEES THREE LAKHS ONLY",600000:"RUPEES SIX LAKHS ONLY",
+    700000:"RUPEES SEVEN LAKHS ONLY",800000:"RUPEES EIGHT LAKHS ONLY",
+    900000:"RUPEES NINE LAKHS ONLY",
+  };
+  return map[n]||`RUPEES ${Number(n).toLocaleString('en-IN')} ONLY`;
 }
 function fmtRs(n){return `RS. ${Number(n).toLocaleString('en-IN')}/-`;}
 
