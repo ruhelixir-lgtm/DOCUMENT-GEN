@@ -1,193 +1,167 @@
 'use strict';
 /**
- * Document Generation Engine
- * ---------------------------
- * Two modes:
- *   1. TEMPLATE mode  – docxtemplater fills {{placeholders}} in user-uploaded DOCX
- *   2. PROGRAMMATIC   – original docx-library builders (always available as fallback)
+ * Document Generation Orchestrator
+ * ──────────────────────────────────
+ * Priority:  TEMPLATE MODE  (uploaded DOCX/XLSX with {{placeholders}})
+ * Fallback:  PROGRAMMATIC   (legacy docx-library builders — layout-only,
+ *                            used ONLY when no template is uploaded)
+ *
+ * The programmatic fallback is intentionally kept so the system is always
+ * functional even before any templates are uploaded.
  */
 
 const path         = require('path');
 const fs           = require('fs');
-const Docxtemplater = require('docxtemplater');
-const PizZip       = require('pizzip');
 const archiver     = require('archiver');
-const ExcelJS      = require('exceljs');
+const { Packer }   = require('docx');
 
-const { Template, Party, History } = require('../data/db');
-
-// ── Import original programmatic builders ─────────────────────
+const { Template, Party } = require('../data/db');
+const { buildVars, renderDocx, renderDocxForDirector } = require('./templateEngine');
+const { renderXlsx, buildXlsxVars }                    = require('./xlsxEngine');
 const programmatic = require('./programmatic');
 
-// ── Variable map builder ──────────────────────────────────────
-function buildVars(D) {
-  const fmt  = n => `RS. ${Number(n).toLocaleString('en-IN')}/-`;
-  const dirs = D.directors || [];
-
-  return {
-    // Lender
-    LENDER_NAME:    D.lender?.name    || '',
-    LENDER_PAN:     D.lender?.pan     || '',
-    LENDER_ADDRESS: (D.lender?.address || []).join(', '),
-
-    // Company
-    COMPANY_NAME:    D.company?.name    || '',
-    COMPANY_PAN:     D.company?.pan     || '',
-    COMPANY_ADDRESS: (D.company?.address || []).join(', '),
-
-    // Borrower (first director)
-    BORROWER_NAME:    dirs[0]?.name    || '',
-    DIRECTOR_NAME:    dirs[0]?.name    || '',
-    DIRECTOR_AADHAAR: dirs[0]?.aadhaar || '',
-    DIRECTOR_PAN:     dirs[0]?.pan     || '',
-    DIRECTOR_MOBILE:  dirs[0]?.mobile  || '',
-    DIRECTOR_ADDRESS: (dirs[0]?.address || []).join(', '),
-    ALL_DIRECTORS:    dirs.map(d => d.name).join(', '),
-    DIRECTOR_SIGS:    dirs.map(d => `(${d.name})`).join('     '),
-
-    // Loan
-    LOAN_AMOUNT:          String(D.loan?.boeAmount     || 0),
-    LOAN_AMOUNT_FMT:      fmt(D.loan?.boeAmount        || 0),
-    LOAN_AMOUNT_WORDS:    programmatic.toWords(D.loan?.boeAmount || 0),
-    INTEREST_AMOUNT:      String(D.loan?.interestAmount || 0),
-    INTEREST_AMOUNT_FMT:  fmt(D.loan?.interestAmount   || 0),
-    INTEREST_AMOUNT_WORDS:programmatic.toWords(D.loan?.interestAmount || 0),
-    NET_DISBURSED:        String(D.loan?.netDisbursed   || 0),
-    NET_DISBURSED_FMT:    fmt(D.loan?.netDisbursed      || 0),
-    NET_DISBURSED_WORDS:  programmatic.toWords(D.loan?.netDisbursed || 0),
-    RATE_PERCENT:         String((D.loan?.ratePercent || 0).toFixed(2)),
-    TENURE_MONTHS:        String(D.loan?.tenureMonths  || 0),
-
-    // Dates
-    REQUEST_DATE:      D.loan?.requestDate      || '',
-    DISBURSEMENT_DATE: D.loan?.disbursementDate || '',
-    BOARD_RES_DATE:    D.loan?.boardResDate     || '',
-    BOARD_DATE:        D.loan?.boardResDate     || '',
-
-    // Payment
-    RTGS_NO:   D.loan?.rtgsNo   || '',
-    RTGS_BANK: D.loan?.rtgsBank || '',
-    PLACE:     D.loan?.place    || 'Mumbai',
-
-    // Cheque table (plain text summary)
-    CHEQUE_TABLE: (D.cheques || []).filter(c => c.no)
-      .map((c, i) => `${i+1}. Cheque No: ${c.no}  Date: ${c.date}  Amount: ${c.amount}`)
-      .join('\n') || '(no cheques entered)',
-  };
+// ── Ensure interest / net are calculated if not supplied ──────────
+function ensureCalc(D) {
+  const amt  = Number(D.loan?.boeAmount)    || 0;
+  const rate = Number(D.loan?.ratePercent)  || 0;
+  const mnth = Number(D.loan?.tenureMonths) || 0;
+  if (!D.loan.interestAmount)
+    D.loan.interestAmount = Math.round(amt * (rate / 100) * mnth);
+  if (!D.loan.netDisbursed)
+    D.loan.netDisbursed = amt - D.loan.interestAmount;
 }
 
-// ── Render one DOCX template ──────────────────────────────────
-function renderTemplate(templatePath, vars) {
-  const content = fs.readFileSync(templatePath, 'binary');
-  const zip     = new PizZip(content);
-  const doc     = new Docxtemplater(zip, {
-    paragraphLoop: true,
-    linebreaks:    true,
-    delimiters:    { start: '{{', end: '}}' },
-    errorLogging:  false,
-  });
-  doc.render(vars);
-  return doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+// ── Write a buffer to disk ────────────────────────────────────────
+function write(filePath, buf) {
+  fs.writeFileSync(filePath, buf);
 }
 
-// ── Main generate function ────────────────────────────────────
+// ── Generate all documents ────────────────────────────────────────
 async function generate(D, partyId, selectedDocs, outDir) {
-  const party = partyId ? Party.get(partyId) : null;
+  ensureCalc(D);
   fs.mkdirSync(outDir, { recursive: true });
 
+  const party = partyId ? Party.get(partyId) : null;
+  const vars  = buildVars(D);
+  const xvars = buildXlsxVars(D);
   const generated = [];
 
-  // auto-calc if missing
-  if (!D.loan.interestAmount)
-    D.loan.interestAmount = Math.round(D.loan.boeAmount * (D.loan.ratePercent / 100) * D.loan.tenureMonths);
-  if (!D.loan.netDisbursed)
-    D.loan.netDisbursed = D.loan.boeAmount - D.loan.interestAmount;
+  // Helper: resolve template for a doc type
+  function getTmpl(docType) {
+    if (!party) return null;
+    const t = Template.getByType(party.id, docType);
+    return (t && fs.existsSync(t.file_path)) ? t : null;
+  }
 
-  const vars = buildVars(D);
+  // ── DOCX documents ────────────────────────────────────────────
+  const docxJobs = [
+    { key: 'request_letter',      num: '1',  label: 'Request_Letter',      prog: () => programmatic.makeRequestLetter(D)      },
+    { key: 'authority_letter',    num: '2',  label: 'Authority_Letter',     prog: () => programmatic.makeAuthorityLetter(D)    },
+    { key: 'receipt',             num: '3',  label: 'Receipt',              prog: () => programmatic.makeReceipt(D)            },
+    { key: 'board_resolution',    num: '5',  label: 'Board_Resolution',     prog: () => programmatic.makeBoardResolution(D)    },
+    { key: 'company_undertaking', num: '9',  label: 'Company_Undertaking',  prog: () => programmatic.makeCompanyUndertaking(D) },
+  ];
 
-  // Doc type → programmatic builder map
-  const progBuilders = {
-    request_letter:      () => programmatic.makeRequestLetter(D),
-    authority_letter:    () => programmatic.makeAuthorityLetter(D),
-    receipt:             () => programmatic.makeReceipt(D),
-    board_resolution:    () => programmatic.makeBoardResolution(D),
-    company_undertaking: () => programmatic.makeCompanyUndertaking(D),
-  };
+  for (const job of docxJobs) {
+    if (selectedDocs && !selectedDocs.includes(job.key)) continue;
 
-  // Personal undertakings (one per director)
-  const dirUndertakings = (D.directors || []).map((dir, i) => ({
-    key: `personal_undertaking_${i}`,
-    label: `${6 + i}-Conf_Undertaking_${dir.name.replace(/ /g, '_')}`,
-    builder: () => programmatic.makePersonalUndertaking(D, dir)
-  }));
+    const filename = `${job.num}-${job.label}_${slug(D.company?.name)}.docx`;
+    const outFile  = path.join(outDir, filename);
+    const tmpl     = getTmpl(job.key);
 
-  // Decide which DOCX docs to generate
-  const docxDocs = [
-    { key: 'request_letter',      label: '1-Request_Letter' },
-    { key: 'authority_letter',    label: '2-Authority_Letter' },
-    { key: 'receipt',             label: '3-Receipt' },
-    { key: 'board_resolution',    label: '5-Board_Resolution' },
-    { key: 'company_undertaking', label: '9-Company_Undertaking' },
-    ...dirUndertakings,
-  ].filter(d => !selectedDocs || selectedDocs.includes(d.key) || d.key.startsWith('personal_undertaking'));
-
-  const { Packer } = require('docx');
-
-  for (const item of docxDocs) {
-    const baseKey = item.key.startsWith('personal_undertaking') ? 'personal_undertaking' : item.key;
-    const tmpl    = party ? Template.getByType(party.id, baseKey) : null;
-    const outFile = path.join(outDir, item.label + '.docx');
-
-    if (tmpl && fs.existsSync(tmpl.file_path)) {
-      // ── TEMPLATE MODE ─────────────────────────────────────
-      // For per-director undertakings, override director vars
-      let docVars = { ...vars };
-      if (item.key.startsWith('personal_undertaking_')) {
-        const idx = parseInt(item.key.split('_').pop());
-        const dir = D.directors[idx];
-        if (dir) {
-          docVars.DIRECTOR_NAME    = dir.name;
-          docVars.DIRECTOR_AADHAAR = dir.aadhaar;
-          docVars.DIRECTOR_PAN     = dir.pan;
-          docVars.DIRECTOR_MOBILE  = dir.mobile;
-          docVars.DIRECTOR_ADDRESS = (dir.address || []).join(', ');
-          docVars.BORROWER_NAME    = dir.name;
-        }
-      }
+    if (tmpl) {
       try {
-        const buf = renderTemplate(tmpl.file_path, docVars);
-        fs.writeFileSync(outFile, buf);
-        generated.push({ label: item.label, file: outFile, mode: 'template' });
+        const buf = renderDocx(tmpl.file_path, vars);
+        write(outFile, buf);
+        generated.push({ label: job.label, file: outFile, mode: 'template' });
         continue;
       } catch (e) {
-        console.warn(`Template render failed for ${item.label}, falling back to programmatic:`, e.message);
+        console.warn(`[template] ${job.label} failed, falling back: ${e.message}`);
       }
     }
 
-    // ── PROGRAMMATIC MODE (fallback / default) ────────────
-    const builder = progBuilders[baseKey] || item.builder;
-    if (builder) {
-      const doc = builder();
+    // programmatic fallback
+    const doc = job.prog();
+    const buf = await Packer.toBuffer(doc);
+    write(outFile, buf);
+    generated.push({ label: job.label, file: outFile, mode: 'programmatic' });
+  }
+
+  // ── Personal Undertakings — one per director ──────────────────
+  if (!selectedDocs || selectedDocs.includes('personal_undertaking')) {
+    const tmpl = getTmpl('personal_undertaking');
+    for (let i = 0; i < (D.directors || []).length; i++) {
+      const dir      = D.directors[i];
+      const num      = 6 + i;
+      const filename = `${num}-Conf_Undertaking_${slug(dir.name)}.docx`;
+      const outFile  = path.join(outDir, filename);
+
+      if (tmpl) {
+        try {
+          const buf = renderDocxForDirector(tmpl.file_path, vars, dir);
+          write(outFile, buf);
+          generated.push({ label: `Conf_Undertaking_${dir.name}`, file: outFile, mode: 'template' });
+          continue;
+        } catch (e) {
+          console.warn(`[template] personal_undertaking ${dir.name} failed, falling back: ${e.message}`);
+        }
+      }
+
+      const doc = programmatic.makePersonalUndertaking(D, dir);
       const buf = await Packer.toBuffer(doc);
-      fs.writeFileSync(outFile, buf);
-      generated.push({ label: item.label, file: outFile, mode: 'programmatic' });
+      write(outFile, buf);
+      generated.push({ label: `Conf_Undertaking_${dir.name}`, file: outFile, mode: 'programmatic' });
     }
   }
 
-  // ── XLSX docs ─────────────────────────────────────────────
+  // ── XLSX: Bill of Exchange ────────────────────────────────────
   if (!selectedDocs || selectedDocs.includes('bill_of_exchange')) {
-    await programmatic.makeBillOfExchange(D, outDir);
-    generated.push({ label: '4-Bill_of_Exchange', file: path.join(outDir, '4-Bill_of_Exchange.xlsx'), mode: 'programmatic' });
+    const filename = `4-Bill_of_Exchange_${slug(D.company?.name)}.xlsx`;
+    const outFile  = path.join(outDir, filename);
+    const tmpl     = getTmpl('bill_of_exchange');
+
+    if (tmpl) {
+      try {
+        const buf = await renderXlsx(tmpl.file_path, xvars);
+        write(outFile, buf);
+        generated.push({ label: 'Bill_of_Exchange', file: outFile, mode: 'template' });
+      } catch (e) {
+        console.warn(`[template] BoE xlsx failed, falling back: ${e.message}`);
+        await programmatic.makeBillOfExchange(D, outDir, filename);
+        generated.push({ label: 'Bill_of_Exchange', file: outFile, mode: 'programmatic' });
+      }
+    } else {
+      await programmatic.makeBillOfExchange(D, outDir, filename);
+      generated.push({ label: 'Bill_of_Exchange', file: outFile, mode: 'programmatic' });
+    }
   }
+
+  // ── XLSX: Promissory Note ─────────────────────────────────────
   if (!selectedDocs || selectedDocs.includes('promissory_note')) {
-    await programmatic.makePromissoryNote(D, outDir);
-    generated.push({ label: '10-Promissory_Note', file: path.join(outDir, '10-Promissory_Note.xlsx'), mode: 'programmatic' });
+    const filename = `10-Promissory_Note_${slug(D.company?.name)}.xlsx`;
+    const outFile  = path.join(outDir, filename);
+    const tmpl     = getTmpl('promissory_note');
+
+    if (tmpl) {
+      try {
+        const buf = await renderXlsx(tmpl.file_path, xvars);
+        write(outFile, buf);
+        generated.push({ label: 'Promissory_Note', file: outFile, mode: 'template' });
+      } catch (e) {
+        console.warn(`[template] Promissory xlsx failed, falling back: ${e.message}`);
+        await programmatic.makePromissoryNote(D, outDir, filename);
+        generated.push({ label: 'Promissory_Note', file: outFile, mode: 'programmatic' });
+      }
+    } else {
+      await programmatic.makePromissoryNote(D, outDir, filename);
+      generated.push({ label: 'Promissory_Note', file: outFile, mode: 'programmatic' });
+    }
   }
 
   return generated;
 }
 
-// ── ZIP helper ────────────────────────────────────────────────
+// ── ZIP a directory into a single zip file ────────────────────────
 function zipDirectory(srcDir, destZip) {
   return new Promise((resolve, reject) => {
     const output  = fs.createWriteStream(destZip);
@@ -200,4 +174,9 @@ function zipDirectory(srcDir, destZip) {
   });
 }
 
-module.exports = { generate, zipDirectory, buildVars };
+// ── Safe filename slug from company name ─────────────────────────
+function slug(name) {
+  return (name || 'docs').replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30);
+}
+
+module.exports = { generate, zipDirectory, buildVars: require('./templateEngine').buildVars };
