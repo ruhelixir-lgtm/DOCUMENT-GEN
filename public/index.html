@@ -268,9 +268,16 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
       <div class="party-selector-wrap">
         <label>🏦 Select Lender / Party</label>
         <select id="selParty" onchange="onPartyChange()">
-          <option value="">— Select Party —</option>
+          <option value="">— No Party / Manual Entry —</option>
         </select>
         <div class="party-info-strip" id="partyInfoStrip"></div>
+      </div>
+
+      <!-- Template mode status banner -->
+      <div id="tmplModeBanner" style="display:none;padding:10px 16px;border-radius:9px;font-size:.82rem;font-weight:500;margin-bottom:18px;display:flex;align-items:center;gap:10px;border:1px solid rgba(46,204,113,.3);background:rgba(46,204,113,.07);color:var(--green)">
+        <span style="font-size:18px">📋</span>
+        <span id="tmplModeText">Templates loaded — documents will use uploaded DOCX/XLSX stationery.</span>
+        <a href="#" onclick="nav('templates');return false" style="margin-left:auto;font-size:.76rem;color:var(--accent);text-decoration:none;white-space:nowrap">Manage templates →</a>
       </div>
 
       <!-- Loan Details -->
@@ -930,6 +937,7 @@ async function refreshPartyDropdowns() {
 async function onPartyChange() {
   const partyId = document.getElementById('selParty').value;
   document.getElementById('partyInfoStrip').innerHTML='';
+  document.getElementById('tmplModeBanner').style.display = 'none';
   if (!partyId) return;
   const res  = await fetch(`/api/parties/${partyId}`);
   const data = await res.json();
@@ -957,6 +965,23 @@ async function onPartyChange() {
     const up = (td.templates||[]).filter(t=>t.uploaded).length;
     document.getElementById('partyTmplCount').textContent = `${up} uploaded`;
     document.getElementById('partyTmplCount').style.color = up>0?'var(--green)':'var(--yellow)';
+    // Show/update template mode banner
+    const banner = document.getElementById('tmplModeBanner');
+    if (up > 0) {
+      banner.style.display = 'flex';
+      document.getElementById('tmplModeText').textContent =
+        `✅ Template mode active — ${up} DOCX/XLSX templates uploaded. Documents will use your exact stationery.`;
+      banner.style.borderColor = 'rgba(46,204,113,.3)';
+      banner.style.background  = 'rgba(46,204,113,.07)';
+      banner.style.color       = 'var(--green)';
+    } else {
+      banner.style.display = 'flex';
+      document.getElementById('tmplModeText').textContent =
+        `⚠️ No templates uploaded for this party — documents will be generated in programmatic fallback mode.`;
+      banner.style.borderColor = 'rgba(240,180,41,.3)';
+      banner.style.background  = 'rgba(240,180,41,.07)';
+      banner.style.color       = 'var(--yellow)';
+    }
   } catch(_) {}
 }
 </script>
@@ -1039,26 +1064,143 @@ async function doGenerate() {
 // ══════════════════════════════════════════════════
 function loadVarGuide() {
   const groups = [
-    { title:'🏦 Lender', vars:['LENDER_NAME','LENDER_PAN','LENDER_ADDRESS'] },
-    { title:'🏢 Company', vars:['COMPANY_NAME','COMPANY_PAN','COMPANY_ADDRESS'] },
-    { title:'👤 Director / Borrower', vars:['BORROWER_NAME','DIRECTOR_NAME','DIRECTOR_AADHAAR','DIRECTOR_PAN','DIRECTOR_MOBILE','DIRECTOR_ADDRESS','ALL_DIRECTORS','DIRECTOR_SIGS'] },
-    { title:'💰 Loan', vars:['LOAN_AMOUNT','LOAN_AMOUNT_FMT','LOAN_AMOUNT_WORDS','INTEREST_AMOUNT','INTEREST_AMOUNT_FMT','INTEREST_AMOUNT_WORDS','NET_DISBURSED','NET_DISBURSED_FMT','NET_DISBURSED_WORDS','RATE_PERCENT','TENURE_MONTHS'] },
-    { title:'📅 Dates', vars:['REQUEST_DATE','DISBURSEMENT_DATE','BOARD_RES_DATE','BOARD_DATE'] },
-    { title:'🏦 Payment', vars:['RTGS_NO','RTGS_BANK','PLACE'] },
-    { title:'📋 Cheques', vars:['CHEQUE_TABLE'] },
+    {
+      title: '🏦 Lender',
+      note: 'Auto-filled from selected Party',
+      vars: [
+        ['LENDER_NAME','Lender entity name'],
+        ['LENDER_PAN','Lender PAN number'],
+        ['LENDER_ADDRESS','Lender full address'],
+      ]
+    },
+    {
+      title: '🏢 Borrower Company',
+      vars: [
+        ['COMPANY_NAME','Full company name'],
+        ['COMPANY_PAN','Company PAN'],
+        ['COMPANY_CIN','Company CIN'],
+        ['COMPANY_ADDRESS','Registered address'],
+        ['COMPANY_PHONE','Phone number'],
+        ['COMPANY_EMAIL','Email address'],
+      ]
+    },
+    {
+      title: '💰 Loan Figures',
+      vars: [
+        ['LOAN_AMOUNT','Numeric e.g. 2000000'],
+        ['LOAN_AMOUNT_FMT','RS. 20,00,000/-'],
+        ['LOAN_AMOUNT_WORDS','RUPEES TWENTY LAKHS ONLY'],
+        ['INTEREST_AMOUNT','Numeric discount amount'],
+        ['INTEREST_AMOUNT_FMT','RS. 2,25,000/-'],
+        ['INTEREST_AMOUNT_WORDS','RUPEES TWO LAKHS TWENTY FIVE THOUSAND ONLY'],
+        ['NET_DISBURSED','Numeric net amount'],
+        ['NET_DISBURSED_FMT','RS. 17,75,000/-'],
+        ['NET_DISBURSED_WORDS','RUPEES SEVENTEEN LAKHS … ONLY'],
+        ['RATE_PERCENT','e.g. 2.25'],
+        ['TENURE_MONTHS','e.g. 5'],
+      ]
+    },
+    {
+      title: '📅 Dates & Reference',
+      vars: [
+        ['REQUEST_DATE','DD/MM/YYYY'],
+        ['DISBURSEMENT_DATE','DD/MM/YYYY'],
+        ['BOARD_RES_DATE','MONDAY, MARCH 3, 2026'],
+        ['RTGS_NO','UTR / cheque number'],
+        ['RTGS_BANK','Disbursement bank name'],
+        ['PLACE','e.g. Mumbai'],
+      ]
+    },
+    {
+      title: '👤 Director Scalars  (first 3 directors)',
+      note: 'Use numbered vars when multiple directors in one template',
+      vars: [
+        ['DIRECTOR_1_NAME','First director name'],
+        ['DIRECTOR_1_PAN',''],['DIRECTOR_1_AADHAAR',''],['DIRECTOR_1_MOBILE',''],['DIRECTOR_1_ADDRESS',''],
+        ['DIRECTOR_2_NAME','Second director'],
+        ['DIRECTOR_2_PAN',''],['DIRECTOR_2_AADHAAR',''],
+        ['DIRECTOR_3_NAME','Third director'],
+      ]
+    },
+    {
+      title: '👤 Director Aggregate',
+      note: 'Useful for single-line signatures and authority letters',
+      vars: [
+        ['ALL_DIRECTOR_NAMES','Comma-separated list'],
+        ['DIRECTOR_SIG_LINE','(NAME1)     (NAME2)'],
+        ['DIRECTOR_AND_OR','NAME1 and/or NAME2'],
+      ]
+    },
+    {
+      title: '🔁 Director Loop  (one block per director)',
+      note: 'Use {#directors}…{/directors} in DOCX to repeat for each director',
+      vars: [
+        ['DIRECTOR_NAME','Inside loop — this director'],
+        ['DIRECTOR_PAN',''],['DIRECTOR_AADHAAR',''],['DIRECTOR_MOBILE',''],['DIRECTOR_ADDRESS',''],
+      ]
+    },
+    {
+      title: '👤 Personal Undertaking  (single-director template)',
+      note: 'Template rendered once per director. All vars below resolve to that director.',
+      vars: [
+        ['DIRECTOR_NAME','This director\'s name'],
+        ['DIRECTOR_PAN',''],['DIRECTOR_AADHAAR',''],['DIRECTOR_MOBILE',''],['DIRECTOR_ADDRESS',''],
+        ['BORROWER_NAME','Alias for DIRECTOR_NAME'],
+      ]
+    },
+    {
+      title: '📋 Cheque Loop  {#cheques}…{/cheques}',
+      note: 'Repeats for each cheque row entered',
+      vars: [
+        ['SR_NO','Row number 1,2,3…'],
+        ['CHEQUE_NO','Cheque number (blank if not entered)'],
+        ['CHEQUE_DATE','Date in DD.MM.YYYY'],
+        ['CHEQUE_AMOUNT','Amount in Indian format'],
+      ]
+    },
+    {
+      title: '📋 Flat Cheque Vars  (fixed-row tables)',
+      note: 'Use when template has a fixed number of rows',
+      vars: [
+        ['CHQ1_NO',''],['CHQ1_DATE',''],['CHQ1_AMOUNT',''],
+        ['CHQ2_NO',''],['CHQ2_DATE',''],['CHQ2_AMOUNT',''],
+        ['CHEQUE_TABLE','All cheques as plain text (single-cell insert)'],
+      ]
+    },
+    {
+      title: '📊 XLSX Flat Director Vars  (Bill of Exchange / Promissory Note)',
+      note: 'Use in Excel templates for per-director sections',
+      vars: [
+        ['DIR1_NAME',''],['DIR1_PAN',''],['DIR1_AADHAAR',''],['DIR1_ADDRESS',''],
+        ['DIR2_NAME',''],['DIR2_PAN',''],['DIR2_AADHAAR',''],['DIR2_ADDRESS',''],
+      ]
+    },
   ];
-  document.getElementById('varGuide').innerHTML = groups.map(g=>`
-    <div style="margin-bottom:18px">
-      <div style="font-size:.78rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">${g.title}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px">
-        ${g.vars.map(v=>`
-          <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:7px 12px;font-size:.78rem;font-family:monospace;cursor:pointer;user-select:all;transition:border-color .15s"
-               onclick="navigator.clipboard.writeText('{{${v}}}');toast('Copied: {{${v}}}');"
-               title="Click to copy">
-            <span style="color:var(--yellow)">{{</span><span style="color:var(--text)">${v}</span><span style="color:var(--yellow)">}}</span>
+
+  document.getElementById('varGuide').innerHTML = groups.map(g => `
+    <div style="margin-bottom:22px">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px">
+        <div style="font-size:.78rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em">${g.title}</div>
+        ${g.note ? `<div style="font-size:.7rem;color:var(--text3);font-style:italic">${g.note}</div>` : ''}
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:7px">
+        ${g.vars.map(([v, desc]) => `
+          <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:6px 11px;font-size:.78rem;cursor:pointer;user-select:all;transition:border-color .15s;display:flex;align-items:center;gap:6px"
+               onclick="navigator.clipboard.writeText('{{${v}}}');toast('Copied {{${v}}}');"
+               title="${desc||v} — click to copy">
+            <span style="font-family:monospace"><span style="color:var(--yellow)">{{</span><span style="color:var(--text)">${v}</span><span style="color:var(--yellow)">}}</span></span>
+            ${desc ? `<span style="color:var(--text3);font-size:.68rem">${desc}</span>` : ''}
           </div>`).join('')}
       </div>
-    </div>`).join('');
+    </div>`).join('') +
+    `<div style="margin-top:12px;padding:14px;background:rgba(79,142,247,.06);border:1px solid rgba(79,142,247,.2);border-radius:10px;font-size:.8rem;color:var(--text2);line-height:1.7">
+      <strong style="color:var(--accent)">How to use:</strong>
+      Type <code style="background:var(--bg3);padding:1px 5px;border-radius:4px;font-size:.78rem">{{PLACEHOLDER}}</code> directly inside your DOCX or XLSX template.
+      Upload via <strong>Templates</strong> → select party → upload file.
+      The engine replaces every placeholder while keeping your fonts, margins, letterhead, footer, and layout <strong>completely untouched</strong>.
+      <br><br>
+      For full docs see <code style="background:var(--bg3);padding:1px 5px;border-radius:4px;font-size:.78rem">PLACEHOLDER_GUIDE.md</code> in the repository root.
+    </div>`;
 }
 
 // ══════════════════════════════════════════════════

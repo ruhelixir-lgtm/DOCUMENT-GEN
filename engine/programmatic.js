@@ -6,6 +6,9 @@ const {
 } = require('docx');
 const ExcelJS = require('exceljs');
 
+// ── Use the real toWords engine (replaces hardcoded map) ──────────
+const { toWords, fmtRs } = require('./words');
+
 const TNR = "Times New Roman";
 const FS  = 22;
 const thinB  = { style: BorderStyle.SINGLE, size: 2, color: "888888" };
@@ -43,31 +46,14 @@ function buildDoc(children) {
     sections:[{ properties:{page:{size:{width:12240,height:15840},
       margin:{top:1080,right:1080,bottom:1080,left:1260}}}, children }] });
 }
-
-
-function toWords(n) {
-  const map = {
-    2000000:"RUPEES TWENTY LAKHS ONLY",229500:"RUPEES TWO LAKHS TWENTY NINE THOUSAND FIVE HUNDRED ONLY",
-    1770500:"RUPEES SEVENTEEN LAKHS SEVENTY THOUSAND FIVE HUNDRED ONLY",
-    4800000:"RUPEES FORTY EIGHT LAKHS ONLY",1019200:"RUPEES TEN LAKHS NINETEEN THOUSAND TWO HUNDRED ONLY",
-    3780800:"RUPEES THIRTY SEVEN LAKHS EIGHTY THOUSAND EIGHT HUNDRED ONLY",
-    1000000:"RUPEES TEN LAKHS ONLY",1500000:"RUPEES FIFTEEN LAKHS ONLY",
-    2500000:"RUPEES TWENTY FIVE LAKHS ONLY",3000000:"RUPEES THIRTY LAKHS ONLY",
-    500000:"RUPEES FIVE LAKHS ONLY",200000:"RUPEES TWO LAKHS ONLY",
-    5000000:"RUPEES FIFTY LAKHS ONLY",10000000:"RUPEES ONE CRORE ONLY",
-    750000:"RUPEES SEVEN LAKHS FIFTY THOUSAND ONLY",250000:"RUPEES TWO LAKHS FIFTY THOUSAND ONLY",
-    100000:"RUPEES ONE LAKH ONLY",300000:"RUPEES THREE LAKHS ONLY",
-    600000:"RUPEES SIX LAKHS ONLY",700000:"RUPEES SEVEN LAKHS ONLY",
-    800000:"RUPEES EIGHT LAKHS ONLY",900000:"RUPEES NINE LAKHS ONLY",
-  };
-  return map[n] || `RUPEES ${Number(n).toLocaleString('en-IN')} ONLY`;
-}
-function fmtRs(n) { return `RS. ${Number(n).toLocaleString('en-IN')}/-`; }
 function toBlock(lender) {
+  const lines = Array.isArray(lender.address)
+    ? lender.address
+    : String(lender.address || '').split(/,\s*|\n/).filter(Boolean);
   return [
     P([R("To,")],{after:40}),
     P([B(lender.name+",")],{after:40}),
-    ...(lender.address||[]).map(l=>P([R(l)],{after:40})),
+    ...lines.map(l=>P([R(l)],{after:40})),
   ];
 }
 
@@ -139,9 +125,12 @@ function makeBoardResolution(D) {
 }
 
 function makePersonalUndertaking(D, director) {
+  const dirAddr = Array.isArray(director.address)
+    ? director.address
+    : String(director.address || '').split('\n').filter(Boolean);
   return buildDoc([
     P([R("From,")],{after:40}),P([B(director.name)],{after:40}),
-    ...(director.address||[]).map(l=>P([R(l)],{after:40})),...SP(),
+    ...dirAddr.map(l=>P([R(l)],{after:40})),...SP(),
     P([R("Date: "),BU(D.loan.disbursementDate)],{after:200}),
     ...toBlock(D.lender),...SP(),
     P([B("Sub: Confirmation "),B("& "),B("Undertaking")],{after:160}),
@@ -217,7 +206,9 @@ function makeCompanyUndertaking(D) {
   ]);
 }
 
-async function makeBillOfExchange(D, outDir) {
+async function makeBillOfExchange(D, outDir, filename) {
+  filename = filename || '4-Bill_of_Exchange.xlsx';
+  const coAddr = Array.isArray(D.company.address) ? D.company.address.join(', ') : (D.company.address || '');
   const wb=new ExcelJS.Workbook();
   const ws=wb.addWorksheet("Sheet1");
   ws.columns=[{width:4},{width:6},{width:14},{width:16},{width:16},{width:6},{width:6},{width:6},{width:6},{width:14},{width:14},{width:6},{width:6}];
@@ -239,6 +230,7 @@ async function makeBillOfExchange(D, outDir) {
   sc(8,3,"To,");sc(9,4,"Acceptor's Name, Address and Sign.");mg(9,4,9,8);
   let br=11;
   for(const dir of D.directors){
+    const dirAddr = Array.isArray(dir.address) ? dir.address.join(', ') : (dir.address || '');
     sc(br,1,"Notice Of Dishonour Waived",{bold:true});mg(br,1,br,4);
     sc(br,10,"Notice Of Dishonour Waived",{bold:true,center:true});mg(br,10,br,13);
     sc(br+1,2,"Revenue Stamp",{bold:true,border:true,center:true});mg(br+1,2,br+2,3);
@@ -246,7 +238,7 @@ async function makeBillOfExchange(D, outDir) {
     sc(br+1,11,"Revenue Stamp",{bold:true,border:true,center:true});mg(br+1,11,br+2,13);
     sc(br+1,1,"ACCEPTED BY",{bold:true});
     sc(br+2,4,dir.name,{bold:true});mg(br+2,4,br+2,9);
-    sc(br+3,4,(dir.address||[]).join(", "));mg(br+3,4,br+4,9);
+    sc(br+3,4,dirAddr);mg(br+3,4,br+4,9);
     sc(br+4,10,"Signature of Drawer",{bold:true,center:true});mg(br+4,10,br+4,13);
     sc(br+5,10,dir.name,{bold:true,center:true});mg(br+5,10,br+5,13);
     sc(br+5,3,"AADHAR No:");sc(br+5,4,dir.aadhaar,{bold:true});mg(br+5,4,br+5,6);
@@ -255,11 +247,13 @@ async function makeBillOfExchange(D, outDir) {
     br+=9;
   }
   sc(br+1,4,"Drawn by:");sc(br+2,4,D.company.name,{bold:true});mg(br+2,4,br+2,9);
-  sc(br+3,4,"Drawer's Address:");sc(br+4,4,(D.company.address||[]).join(", "));mg(br+4,4,br+4,9);
-  await wb.xlsx.writeFile(path.join(outDir,"4-Bill_of_Exchange.xlsx"));
+  sc(br+3,4,"Drawer's Address:");sc(br+4,4,coAddr);mg(br+4,4,br+4,9);
+  await wb.xlsx.writeFile(path.join(outDir, filename));
 }
 
-async function makePromissoryNote(D, outDir) {
+async function makePromissoryNote(D, outDir, filename) {
+  filename = filename || '10-Promissory_Note.xlsx';
+  const coAddr = Array.isArray(D.company.address) ? D.company.address.join(' ') : (D.company.address || '');
   const wb=new ExcelJS.Workbook();
   const ws=wb.addWorksheet("Sheet1");
   ws.columns=[{width:4},{width:6},{width:14},{width:16},{width:16},{width:6},{width:6},{width:6},{width:6},{width:14},{width:14},{width:6},{width:6}];
@@ -280,19 +274,20 @@ async function makePromissoryNote(D, outDir) {
   let br=10;
   for(let i=0;i<D.directors.length;i++){
     const dir=D.directors[i];
+    const dirAddr = Array.isArray(dir.address) ? dir.address.join(', ') : (dir.address || '');
     sc(br,2,"   Signature");mg(br,2,br,4);
     if(i===1){sc(br,10,"Revenue Stamp",{bold:true,border:true,center:true});mg(br,10,br+1,11);sc(br,12,"Revenue Stamp",{bold:true,border:true,center:true});mg(br,12,br+1,13);}
     sc(br+1,4,dir.name,{bold:true});mg(br+1,4,br+1,9);
-    sc(br+2,4,(dir.address||[]).join(", "));mg(br+2,4,br+3,9);
+    sc(br+2,4,dirAddr);mg(br+2,4,br+3,9);
     sc(br+3,3,"PAN No:");sc(br+4,3,dir.pan,{bold:true});
     if(i===D.directors.length-1){
-      const bb=`Signature & Stamp of Borrower FOR : ${D.company.name} ${(D.company.address||[]).join(" ")} (PAN : ${D.company.pan})`;
+      const bb=`Signature & Stamp of Borrower FOR : ${D.company.name} ${coAddr} (PAN : ${D.company.pan})`;
       sc(br+1,10,bb,{bold:true});mg(br+1,10,br+4,13);
     }
     ws.getRow(br).height=20;ws.getRow(br+1).height=18;ws.getRow(br+2).height=30;
     br+=6;
   }
-  await wb.xlsx.writeFile(path.join(outDir,"10-Promissory_Note.xlsx"));
+  await wb.xlsx.writeFile(path.join(outDir, filename));
 }
 
 module.exports = {
