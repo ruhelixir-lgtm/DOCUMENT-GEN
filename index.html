@@ -189,12 +189,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text);
       </div>
     </div>
     <div id="upload_section">
-      <div class="lh-upload-zone" id="dropZone" onclick="document.getElementById('lhFile').click()">
-        <input type="file" accept="image/*" id="lhFile" style="display:none" onchange="handleLhUpload(this)">
+      <div class="lh-upload-zone" id="dropZone">
+        <input type="file" accept="image/*" id="lhFile" onchange="handleLhUpload(this)">
         <div class="lh-icon">🏢</div>
-        <div class="lh-title">Click here to upload letterhead image</div>
+        <div class="lh-title">Click or drag letterhead image here</div>
         <div class="lh-sub">PNG or JPG • Max 5MB • Use original HD scan — not WhatsApp screenshot</div>
-        <div style="margin-top:14px"><button type="button" onclick="event.stopPropagation();document.getElementById('lhFile').click()" style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:10px 24px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">📤 Choose File</button></div>
       </div>
       <div class="lh-preview" id="lhPreview" style="display:none">
         <img id="lhImg" src="" alt="Letterhead preview">
@@ -414,10 +413,8 @@ function goTo(n) {
     const sc = document.getElementById('sc'+i);
     st.className = 'step'+(i===n?' active':(i<n?' done':''));
     if (i < n) sc.textContent = '✓';
-    else if (i === n) sc.textContent = String(i+1);
-    else { sc.textContent = i===6?'↓':String(i+1); }
+    else if (i === n) sc.textContent = i+1;
   }
-  window.scrollTo(0,0);
   if (n === 6) buildDocGrid();
 }
 
